@@ -46,7 +46,7 @@ def chunk_string(input_string: str, chunk_size) -> List[str]:
 
 def full_prompt(message: str, context: str):
     prompt = f"""
-    You are answering a question for a software developer. The context provided includes the entire project structure and content, followed by a question. '
+    You are answering a question for a software developer. The context provided includes the entire project structure and content, followed by a question.
 
     As an excellent software engineer analyze the project and answer the question to the best of your ability.
 
@@ -70,9 +70,32 @@ def full_prompt(message: str, context: str):
     """
     return prompt
 
+def partial_prompt(message: str):
+    prompt = f"""
+    You are answering a question for a software developer.
+
+    As an excellent software engineer analyze the question, any approrpriate reference material, and answer the question to the best of your ability.
+
+    Provide a response that includes:
+    - Guidance on best principles and practices
+    - Code examples where relevant and cite sources where possible.
+    - A explanation of why the response answers the question or solves the problem
+    - Format the response in Markdown.
+
+    DO NOT PROVIDE ANY RESPONSE UNTIL YOU SEE THE PROMPT "Please begin your response now:"
+
+    QUESTION:
+    {message}
+    END QUESTION
+    
+    Please begin your response now:
+    """
+    return prompt
+
 def answer_question(
         context: str,
         message: str,
+        include_code: bool,
         model: str,
         temperature: float,
         max_tokens: int,
@@ -82,7 +105,6 @@ def answer_question(
         prompt_chunk_size: int
 ):
     """Answer a question about a code base"""
-    prompt = message
     generation_config = {
         "temperature": temperature,
         "top_p": top_p,
@@ -98,19 +120,24 @@ def answer_question(
     }
     
     genai_model = genai.GenerativeModel(model_name=model, generation_config=generation_config, safety_settings=safety_settings)
-    
     # Check out context to see if it's too big
-    token_count = genai_model.count_tokens(context)
-    if token_count.total_tokens > 1900000:
-        context = "TOO LARGE, OMITTED"
+    token_count = 0
+    if include_code:
+        token_count = genai_model.count_tokens(context)
+        if token_count.total_tokens > 1900000:
+            context = "TOO LARGE, OMITTED"
 
     logger.debug(f"Token count: {token_count}")
-    
     # Combine context and diff
-    full_input = full_prompt(message=message, context=context)
+    prompt = ""
+    if include_code:
+        prompt = full_prompt(message=message, context=context)
+    else:
+        prompt = partial_prompt(message=message)
+
     
     # Chunk the input if necessary
-    chunked_inputs = chunk_string(input_string=full_input, chunk_size=prompt_chunk_size)
+    chunked_inputs = chunk_string(input_string=prompt, chunk_size=prompt_chunk_size)
     
     convo = genai_model.start_chat(history=[
         {
@@ -147,11 +174,13 @@ def read_project_files(exclude_dirs=['.github', '.git', '.cm', '.idea', 'webpack
 def clean_response(answer):
     response = answer
     response = answer.replace("\n", "  \n")
+    response = answer.replace("```", "``` ")
     response = response.strip('"')
     return response
 
 def send_message(
         message: str,
+        include_code: bool,
         chunk_size: int,
         model: str,
         temperature: float,
@@ -171,17 +200,20 @@ def send_message(
     # Use Rest as the transport agent
     genai.configure(api_key=api_key, transport="rest")
 
-    # Read the entire project content
-    project_content = read_project_files()
-    project_size = len(project_content)
-    logger.debug(f"Project Size: {project_size}")
+    project_content = ""
+    if include_code:
+        # Read the entire project content
+        project_content = read_project_files()
+        project_size = len(project_content)
+        logger.debug(f"Project Size: {project_size}")
 
-    #logger.debug(f"Project content: {project_content}")
+    logger.debug(f"Project content: {project_content}")
     
     # Request a code review
     chunked_answer = answer_question(
         context=project_content,
         message=message,
+        include_code=include_code,
         model=model,
         temperature=temperature,
         max_tokens=max_tokens,
@@ -217,12 +249,14 @@ def receive_data():
     # Extract data from incoming request.
     data = request.get_json()
     message = data.get('message')
+    include_code = data.get('include_code')
 
     if not message:
       return jsonify({'error': 'Missing "message" in JSON body'}), 400
 
     # Send our message to the model for a response
     answer = send_message(message=message, 
+                          include_code = include_code,
                           chunk_size=chunk_size,
                           model=model,
                           temperature=temperature,

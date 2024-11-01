@@ -2,6 +2,7 @@
 <html>
 <head>
     <script type="module" src="https://md-block.verou.me/md-block.js"></script>
+    <script type="text/javascript" src="https://unpkg.com/showdown/dist/showdown.min.js"></script>
     <link rel="stylesheet" href="./css/splendor.css">
     <link rel="stylesheet" href="./css/form.css">
 <title>Ask Gemini (for Code Bases)!</title>
@@ -14,19 +15,28 @@
     <input type="text" class="cs-input" id="userInput" size=70 placeholder="Enter your query">
     <button class="cs-button-solid cs-submit" id="submit_button" onclick="queryServer()">Submit</button>
 </div>
+<div style="text-align:center">
+    <input type="checkbox" id="includeCodeCheckbox" checked="true">
+    <label for="includeCodeCheckbox">Include code</label>
+</div>
 
-<md-block id="output" class="note" markdown="1"></md-block>
+<div id = "output"></div>
+<!--<md-block id="output"></md-block>-->
 
 <script>
   function queryServer() {
     document.getElementById("submit_button").disabled = true;
+    var converter = new showdown.Converter();
 
     // Get user input
     var userInput = document.getElementById("userInput").value;
-    document.getElementById("output").src = "data:text/markdown," + "`Sending query and waiting for a response...`";
+    document.getElementById("output").innerHTML = converter.makeHtml("<p>Sending query and waiting for a response...</p>");
 
     // Prepare JSON data
-    var data = JSON.stringify({ message: userInput });
+    var data = JSON.stringify({ 
+        message: userInput,
+        include_code: document.getElementById("includeCodeCheckbox").checked,
+     });
 
     // Server URL (replace with your actual server endpoint)
     var serverUrl = "http://127.0.0.1:5000/query/"; 
@@ -45,14 +55,15 @@
 
         // Convert JSON response to Markdown (you might need a library for this)
         var markdownOutput = response.answer; // Replace with actual conversion logic
-
+        
+        console.log("Received: " + response.answer);
         // Display Markdown output
-        document.getElementById("output").src = "data:text/markdown," + markdownOutput;
+        document.getElementById("output").innerHTML = converter.makeHtml(markdownOutput);
         document.getElementById("submit_button").disabled = false;
 
       } else if (this.readyState === XMLHttpRequest.DONE) {
         // Handle errors
-        document.getElementById("output").src = "data:text/markdown," + "Error: " + this.status;
+        document.getElementById("output").src = converter.makeHtml("<p>Error: " + this.status + "</p>");
         document.getElementById("submit_button").disabled = false;
 
       }
