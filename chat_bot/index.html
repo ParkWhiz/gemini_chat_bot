@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <script type="module" src="https://md-block.verou.me/md-block.js"></script>
+    <link rel="stylesheet" href="./css/splendor.css">
+    <link rel="stylesheet" href="./css/form.css">
+<title>Ask Gemini (for Code Bases)!</title>
+</head>
+<body>
+
+<h3>Ask Gemini a question about your code base.</h3>
+
+<div style="text-align:center">
+    <input type="text" class="cs-input" id="userInput" size=70 placeholder="Enter your query">
+    <button class="cs-button-solid cs-submit" id="submit_button" onclick="queryServer()">Submit</button>
+</div>
+
+<md-block id="output" class="note" markdown="1"></md-block>
+
+<script>
+  function queryServer() {
+    document.getElementById("submit_button").disabled = true;
+
+    // Get user input
+    var userInput = document.getElementById("userInput").value;
+    document.getElementById("output").src = "data:text/markdown," + "`Sending query and waiting for a response...`";
+
+    // Prepare JSON data
+    var data = JSON.stringify({ message: userInput });
+
+    // Server URL (replace with your actual server endpoint)
+    var serverUrl = "http://127.0.0.1:5000/query/"; 
+
+    var response;
+
+    // Create and send HTTP POST request
+    var xhr = new XMLHttpRequest();
+    xhr.open("POST", serverUrl, true);
+    xhr.setRequestHeader("Content-Type", "application/json");
+
+    xhr.onreadystatechange = function() {
+      if (this.readyState === XMLHttpRequest.DONE && this.status === 200) {
+        // Parse JSON response
+       response = JSON.parse(this.responseText);
+
+        // Convert JSON response to Markdown (you might need a library for this)
+        var markdownOutput = response.answer; // Replace with actual conversion logic
+
+        // Display Markdown output
+        document.getElementById("output").src = "data:text/markdown," + markdownOutput;
+        document.getElementById("submit_button").disabled = false;
+
+      } else if (this.readyState === XMLHttpRequest.DONE) {
+        // Handle errors
+        document.getElementById("output").src = "data:text/markdown," + "Error: " + this.status;
+        document.getElementById("submit_button").disabled = false;
+
+      }
+    };
+
+    xhr.send(data);
+  }
+</script>
+
+</body>
+</html>
