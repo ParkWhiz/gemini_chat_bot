@@ -237,7 +237,7 @@ def receive_data():
   try:
 
     # Define our request defaults
-    model = "gemini-1.5-flash"
+    model = "gemini-1.5-pro"
     chunk_size=500000
     temperature = 0.1
     max_tokens = 8192

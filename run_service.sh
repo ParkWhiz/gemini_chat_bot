@@ -12,6 +12,7 @@ if [ ! -d "$CODE_PATH" ]
         exit 1
 fi
 
-docker pull parkwhiz/chat_bot:0.1
+docker build -t chat_bot .
+#docker pull parkwhiz/chat_bot:0.1
 docker rm chat_bot
 docker run -v $CODE_PATH:/app/code -p 5000:5000 --name chat_bot -e GEMINI_API_KEY="$API_KEY" -i parkwhiz/chat_bot:0.1
