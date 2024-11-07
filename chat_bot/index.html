@@ -61,11 +61,10 @@
         document.getElementById("output").innerHTML = converter.makeHtml(markdownOutput);
         document.getElementById("submit_button").disabled = false;
 
-      } else if (this.readyState === XMLHttpRequest.DONE) {
+      } else if (this.status !== 200) {
         // Handle errors
         document.getElementById("output").src = converter.makeHtml("<p>Error: " + this.status + "</p>");
         document.getElementById("submit_button").disabled = false;
-
       }
     };
 

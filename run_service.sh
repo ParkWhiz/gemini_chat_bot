@@ -12,8 +12,12 @@ if [ ! -d "$CODE_PATH" ]
         exit 1
 fi
 
+echo "Stopping existing container"
+cur_proc=$(docker ps | grep chat_bot)
+if [[ ! -e $proc ]]; then docker rm -f chat_bot; fi
+
+echo "Building image"
 docker build -t chat_bot .
-#docker pull parkwhiz/chat_bot:0.1
-docker rm chat_bot
+
 echo "Chat bot can be accessed at http://127.0.0.1:5000/index.html"
-docker run -v $CODE_PATH:/app/code -p 5000:5000 --name chat_bot -e GEMINI_API_KEY="$API_KEY" -i parkwhiz/chat_bot:0.1
+docker run -v $CODE_PATH:/app/code -p 5000:5000 --name chat_bot -e GEMINI_API_KEY="$API_KEY" -i chat_bot
