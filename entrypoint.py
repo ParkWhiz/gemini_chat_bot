@@ -126,8 +126,8 @@ def answer_question(
         token_count = genai_model.count_tokens(context)
         if token_count.total_tokens > 1900000:
             context = "TOO LARGE, OMITTED"
+        logger.debug(f"Code Base token count: {token_count}")
 
-    logger.debug(f"Token count: {token_count}")
     # Combine context and diff
     prompt = ""
     if include_code:
@@ -135,7 +135,9 @@ def answer_question(
     else:
         prompt = partial_prompt(message=message)
 
-    
+    full_token_count = genai_model.count_tokens(prompt)
+    logger.debug(f"Full token count: {full_token_count}")
+
     # Chunk the input if necessary
     chunked_inputs = chunk_string(input_string=prompt, chunk_size=prompt_chunk_size)
     
@@ -149,15 +151,18 @@ def answer_question(
     for chunked_input in chunked_inputs:
         logger.debug(f"Chunked input...")
         convo.send_message(chunked_input)
+        logger.debug(f"Message Sent...")
 
 
+
+    logger.debug("Done sending, cleaning repsonse.")
     conversation_result = clean_response(convo.last.text)
-    logger.debug(f"Response AI: {conversation_result}")
+    #logger.debug(f"Response AI: {conversation_result}")
 
     return conversation_result
 
 
-def read_project_files(exclude_dirs=['.github', '.git', '.cm', '.idea', 'webpack']):
+def read_project_files(exclude_dirs=['.github', '.git', '.cm', '.idea', 'webpack', 'spec', 'script', 'benchmarks', 'bin', 'benchmarks', 'log']):
     project_content = []
     for root, dirs, files in os.walk('code'):
         dirs[:] = [d for d in dirs if d not in exclude_dirs]
@@ -207,7 +212,7 @@ def send_message(
         project_size = len(project_content)
         logger.debug(f"Project Size: {project_size}")
 
-    logger.debug(f"Project content: {project_content}")
+    #logger.debug(f"Project content: {project_content}")
     
     # Request a code review
     chunked_answer = answer_question(
@@ -222,7 +227,7 @@ def send_message(
         presence_penalty=presence_penalty,
         prompt_chunk_size=chunk_size
     )
-    logger.debug(f"Chunked reviews: {chunked_answer}")
+    #debug(f"Chunked reviews: {chunked_answer}")
     return chunked_answer
     
 # Define a web server to receive incoming requests to interact with Gemini
@@ -268,6 +273,7 @@ def receive_data():
 
     return jsonify({'answer': f'{answer}'}), 200
   except Exception as e:
+    logger.debug(f"Exception occurred: {e}")
     return jsonify({'error': str(e)}), 500
 
 if __name__ == "__main__":
