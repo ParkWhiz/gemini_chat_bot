@@ -3,9 +3,6 @@
 ## Pre-Requisites
 Docker and Chrome/Firefox.  Edge? Maybe, idk.
 
-## Pull the latest docker image
-Currently `parkwhiz/chat_bot:0.1`
-
 ## Get Gemini API Key
 You'll need this as an arg to start the service
 
@@ -17,3 +14,5 @@ For convenience the script `run_service.sh` can be leveraged.
 Navigate to `http://127.0.0.1:5000/index.html`
 
 Enter your query, hit submit, be patient, especially on a large code base.
+
+Note: If you are on MacOS Monterey or later and have AirPlay enabled, then you will be unable to use port 5000. You must either disable AirPlay or run this project on a different port.
