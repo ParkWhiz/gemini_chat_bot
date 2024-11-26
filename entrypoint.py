@@ -162,7 +162,7 @@ def answer_question(
     return conversation_result
 
 
-def read_project_files(exclude_dirs=['.github', '.git', '.cm', '.idea', 'webpack', 'spec', 'script', 'benchmarks', 'bin', 'benchmarks', 'log', 'node_modules']):
+def read_project_files(exclude_dirs=['.github', '.git', '.cm', '.idea', 'webpack', 'spec', 'script', 'benchmarks', 'bin', 'benchmarks', 'log', 'node_modules', 'dist']):
     project_content = []
     for root, dirs, files in os.walk('code'):
         dirs[:] = [d for d in dirs if d not in exclude_dirs]
