@@ -16,11 +16,13 @@ from typing import List
 import click
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
-import requests
+from google.generativeai import caching
 from loguru import logger
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import tiktoken
+import datetime
+
 
 def count_tokens(text, model_name):
     encoding = tiktoken.encoding_for_model(model_name)
@@ -43,6 +45,36 @@ def chunk_string(input_string: str, chunk_size) -> List[str]:
     for i in range(0, len(input_string), chunk_size):
         chunked_inputs.append(input_string[i:i + chunk_size])
     return chunked_inputs
+
+def context_prompt(context: str):
+    prompt = f"""
+    You are answering a question for a software developer. The context provided includes the entire project structure and content, followed by a question.
+
+    As an excellent software engineer analyze the project and answer the question to the best of your ability.
+
+    Provide a response that includes:
+    - Guidance on where in the code base to look to answer the question.
+    - Responses should include relevant file names, method names, data strutures or any other relevant information.
+    - A explanation of why this appears to be the relevant location to answer the question
+    - Format the response in Markdown.
+
+    DO NOT PROVIDE ANY RESPONSE UNTIL YOU SEE THE PROMPT "Please begin your response now:"
+
+    CONTEXT:
+    {context}
+    END CONTEXT
+    """
+    return prompt 
+
+def question_prompt(message: str):
+    prompt = f"""
+    QUESTION:
+    {message}
+    END QUESTION
+    
+    Please begin your response now:
+    """
+    return prompt 
 
 def full_prompt(message: str, context: str):
     prompt = f"""
@@ -96,6 +128,7 @@ def answer_question(
         context: str,
         message: str,
         include_code: bool,
+        cache_key: str,
         model: str,
         temperature: float,
         max_tokens: int,
@@ -119,53 +152,70 @@ def answer_question(
         HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
     }
     
+    # Define our non cache
     genai_model = genai.GenerativeModel(model_name=model, generation_config=generation_config, safety_settings=safety_settings)
-    # Check out context to see if it's too big
-    token_count = 0
+   
+   # Check out context to see if it's too big
+    message_prompt = partial_prompt(message)
+    use_cache = False
+
     if include_code:
-        token_count = genai_model.count_tokens(context)
+        token_count = 0
+
+        prompt_for_context = context_prompt(context)
+        token_count = genai_model.count_tokens(prompt_for_context)
+        logger.debug(f"Context token count: {token_count}")
+
+        message_prompt = question_prompt(message)
+
         if token_count.total_tokens > 1900000:
             context = "TOO LARGE, OMITTED"
-        logger.debug(f"Code Base token count: {token_count}")
 
-    # Combine context and diff
-    prompt = ""
-    if include_code:
-        prompt = full_prompt(message=message, context=context)
-    else:
-        prompt = partial_prompt(message=message)
+        # Cache this for reuse!
+        cache = ""
+        if (token_count.total_tokens >= 32768):
+            # See if our cache exists
+            exists = False
+            for c in caching.CachedContent.list():
+                logger.debug(f"Looking at cache: {c.display_name}")
+                if c.display_name == cache_key:
+                    exists = True
+                    cache = c
+            if not exists:           
+                # Use the cache_key and upload the project as a cache
+                logger.debug(f"Caching with cache key {cache_key}") 
+                cache = caching.CachedContent.create(
+                    model= model,
+                    contents=prompt_for_context, 
+                    display_name=cache_key, 
+                    ttl=datetime.timedelta(minutes=5)
+                ) 
+                logger.debug("Finished creating context cache")
 
-    full_token_count = genai_model.count_tokens(prompt)
-    logger.debug(f"Full token count: {full_token_count}")
+            logger.debug("Using context cache to init model")
+            genai_model = genai.GenerativeModel.from_cached_content(cached_content=cache)
+            logger.debug("Genearting content respond")
+            response = genai_model.generate_content([(
+                message_prompt
+            )])
+            logger.debug("Done genearating content response")
+            conversation_result = clean_response(response.text)
+            return conversation_result
 
-    # Chunk the input if necessary
-    chunked_inputs = chunk_string(input_string=prompt, chunk_size=prompt_chunk_size)
-    
-    convo = genai_model.start_chat(history=[
-        {
-            "role": "user",
-            "parts": [prompt]
-        }
-    ])
-
-    for chunked_input in chunked_inputs:
-        logger.debug(f"Chunked input...")
-        convo.send_message(chunked_input)
-        logger.debug(f"Message Sent...")
-
-
-
-    logger.debug("Done sending, cleaning repsonse.")
-    conversation_result = clean_response(convo.last.text)
-    #logger.debug(f"Response AI: {conversation_result}")
-
+    # If we're here we are using NO code context as it's too large OR we selected to not include code
+    prompt = partial_prompt(message)
+    response = genai_model.generate_content([(
+        message_prompt
+    )])
+    conversation_result = clean_response(response.result)
     return conversation_result
 
 
-def read_project_files(exclude_dirs=['.github', '.git', '.cm', '.idea', 'webpack', 'spec', 'script', 'benchmarks', 'bin', 'benchmarks', 'log', 'node_modules']):
+def read_project_files(exclude_dirs=['.github', '.git', '.cm', '.idea', 'webpack', 'spec', 'script', 'benchmarks', 'bin', 'benchmarks', 'log', 'node_modules', 'dist']):
     project_content = []
     for root, dirs, files in os.walk('code'):
         dirs[:] = [d for d in dirs if d not in exclude_dirs]
+        #logger.debug(f"Dirs {dirs}")
         for file in files:
             if file.endswith(('.py', '.json', '.kt', '.html', '.js', '.cs', '.qml', '.asp', '.vb',
                               '.ts', '.java', '.c', '.cpp', '.h', '.hpp', '.go', '.rs', '.swift',
@@ -186,6 +236,7 @@ def clean_response(answer):
 def send_message(
         message: str,
         include_code: bool,
+        cache_key: str,
         chunk_size: int,
         model: str,
         temperature: float,
@@ -214,11 +265,12 @@ def send_message(
 
     #logger.debug(f"Project content: {project_content}")
     
-    # Request a code review
+    # Ask the question
     chunked_answer = answer_question(
         context=project_content,
         message=message,
         include_code=include_code,
+        cache_key=cache_key,
         model=model,
         temperature=temperature,
         max_tokens=max_tokens,
@@ -242,7 +294,7 @@ def receive_data():
   try:
 
     # Define our request defaults
-    model = "gemini-1.5-pro"
+    model = "gemini-1.5-pro-001"
     chunk_size=500000
     temperature = 0.1
     max_tokens = 8192
@@ -255,6 +307,7 @@ def receive_data():
     data = request.get_json()
     message = data.get('message')
     include_code = data.get('include_code')
+    cache_key = data.get("cache_key")
 
     if not message:
       return jsonify({'error': 'Missing "message" in JSON body'}), 400
@@ -262,6 +315,7 @@ def receive_data():
     # Send our message to the model for a response
     answer = send_message(message=message, 
                           include_code = include_code,
+                          cache_key = cache_key,
                           chunk_size=chunk_size,
                           model=model,
                           temperature=temperature,

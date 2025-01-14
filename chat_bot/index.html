@@ -5,7 +5,27 @@
     <script type="text/javascript" src="https://unpkg.com/showdown/dist/showdown.min.js"></script>
     <link rel="stylesheet" href="./css/splendor.css">
     <link rel="stylesheet" href="./css/form.css">
-<title>Ask Gemini (for Code Bases)!</title>
+    <title>Ask Gemini (for Code Bases)!</title>
+    <script>
+        function generateUUID() { // Public Domain/MIT
+            var d = new Date().getTime();//Timestamp
+            var d2 = ((typeof performance !== 'undefined') && performance.now && (performance.now()*1000)) || 0;//Time in microseconds since page-load or 0 if unsupported
+            return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+                var r = Math.random() * 16;//random number between 0 and 16
+                if(d > 0){//Use timestamp until depleted
+                    r = (d + r)%16 | 0;
+                    d = Math.floor(d/16);
+                } else {//Use microseconds since page-load if supported
+                    r = (d2 + r)%16 | 0;
+                    d2 = Math.floor(d2/16);
+                }
+                return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+            });
+        }
+        window.onload = function() {
+            window.cacheKey = generateUUID();
+        };
+    </script>
 </head>
 <body>
 
@@ -21,48 +41,36 @@
 </div>
 
 <div id = "output"></div>
-<!--<md-block id="output"></md-block>-->
 
 <script>
   function queryServer() {
     document.getElementById("submit_button").disabled = true;
     var converter = new showdown.Converter();
 
-    // Get user input
     var userInput = document.getElementById("userInput").value;
     document.getElementById("output").innerHTML = converter.makeHtml("<p>Sending query and waiting for a response...</p>");
 
-    // Prepare JSON data
     var data = JSON.stringify({ 
         message: userInput,
         include_code: document.getElementById("includeCodeCheckbox").checked,
+        cache_key: window.cacheKey
      });
 
-    // Server URL (replace with your actual server endpoint)
     var serverUrl = "http://127.0.0.1:5000/query/"; 
 
-    var response;
-
-    // Create and send HTTP POST request
     var xhr = new XMLHttpRequest();
     xhr.open("POST", serverUrl, true);
     xhr.setRequestHeader("Content-Type", "application/json");
 
     xhr.onreadystatechange = function() {
       if (this.readyState === XMLHttpRequest.DONE && this.status === 200) {
-        // Parse JSON response
-       response = JSON.parse(this.responseText);
-
-        // Convert JSON response to Markdown (you might need a library for this)
-        var markdownOutput = response.answer; // Replace with actual conversion logic
-        
+        response = JSON.parse(this.responseText);
+        var markdownOutput = response.answer; 
         console.log("Received: " + response.answer);
-        // Display Markdown output
         document.getElementById("output").innerHTML = converter.makeHtml(markdownOutput);
         document.getElementById("submit_button").disabled = false;
 
       } else if (this.status !== 200) {
-        // Handle errors
         document.getElementById("output").src = converter.makeHtml("<p>Error: " + this.status + "</p>");
         document.getElementById("submit_button").disabled = false;
       }
