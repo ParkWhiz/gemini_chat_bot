@@ -3,8 +3,86 @@
 <head>
     <script type="module" src="https://md-block.verou.me/md-block.js"></script>
     <script type="text/javascript" src="https://unpkg.com/showdown/dist/showdown.min.js"></script>
-    <link rel="stylesheet" href="./css/splendor.css">
-    <link rel="stylesheet" href="./css/form.css">
+    <style>
+      body {
+          font-family: sans-serif; /* Use a modern font */
+          line-height: 1.6;        /* Improve readability */
+          margin: 20px;            /* Add some margin */
+          color: #333;             /* Darker text color */
+          background-color: #f5f5f5;
+        }
+        #leftRail {
+            width: 275px; 
+            float: left;
+            padding: 20px;         /* Increased padding */
+            border-right: 1px solid #eee; /* Lighter border */
+            box-sizing: border-box;  /* Include padding in width */
+            background-color: #fff; /* White background for left rail */
+            border-right: 1px solid #ddd; /* Slightly darker border */
+            height: 100vh; 
+        }
+        #contextStats {
+            width: 100%;            /* Fill the left rail */
+            overflow-y: auto;
+            font-size: 12px;
+            background-color: #f9f9f9;
+            padding: 10px;          /* Add padding within the box */
+            border: 1px solid #eee; /* Light border around stats */
+            margin-bottom: 20px; /* Spacing below stats */
+            box-sizing: border-box;
+        }
+        #mainContent {
+            margin-left: 285px;       /* Match left rail width + padding */
+            padding: 20px;         /* Increased padding */
+            background-color: #fff;
+        }
+        #userInput {
+            width: calc(100% - 100px); /* Adjust width for button */
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            margin-right: 10px;       /* Space between input and button */
+            box-sizing: border-box;
+
+        }
+        .cs-button-solid{
+          width: 90px;
+          padding: 10px;
+          border: none;
+          border-radius: 4px;
+          background-color: #3d84d9; /* Example color */
+          color: white;
+          cursor: pointer;
+        }
+        .cs-input { /* Style the input field */
+            border: 1px solid #ddd;
+        }
+
+        #output {
+            background-color: #fff; /* White background for output area */
+            padding: 15px;
+            border: 1px solid #eee;
+            border-radius: 5px; /* Rounded corners */
+            margin-top: 20px; /* Add some spacing */
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Subtle shadow */
+        }
+
+        .user-message { /* Style user's messages */
+            background-color: #e9f2ff; /* Light blue for user messages */
+            padding: 10px;
+            border-radius: 10px; /* More rounded corners for messages */
+            margin-bottom: 10px;
+            align-self: flex-end;
+        }
+
+        .bot-message { /* Style bot's messages */
+            background-color: #f0f0f0; /* Light gray for bot messages */
+            padding: 10px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            align-self: flex-start;
+        }
+</style>
     <title>Ask Gemini (for Code Bases)!</title>
     <script>
         function generateUUID() { // Public Domain/MIT
@@ -22,63 +100,120 @@
                 return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
             });
         }
+        
         window.onload = function() {
             window.cacheKey = generateUUID();
+            refreshContextStats();
         };
+
+        function handleKeyDown(event) {
+          if (event.key === "Enter") {
+              queryServer();
+          }
+        }
+
+      function queryServer() {
+        document.getElementById("submit_button").disabled = true;
+        var converter = new showdown.Converter();
+
+        var userInput = document.getElementById("userInput").value;
+        document.getElementById("output").innerHTML = converter.makeHtml("<p>Sending query and waiting for a response...</p>");
+
+        var data = JSON.stringify({ 
+            message: userInput,
+            include_code: true,
+            cache_key: window.cacheKey
+        });
+
+        var serverUrl = "http://127.0.0.1:5000/query/"; 
+
+        var xhr = new XMLHttpRequest();
+        xhr.open("POST", serverUrl, true);
+        xhr.setRequestHeader("Content-Type", "application/json");
+
+        xhr.onreadystatechange = function() {
+          if (this.readyState === XMLHttpRequest.DONE && this.status === 200) {
+            response = JSON.parse(this.responseText);
+            var markdownOutput = response.answer; 
+            console.log("Received: " + response.answer);
+            document.getElementById("output").innerHTML = converter.makeHtml(markdownOutput);
+            document.getElementById("submit_button").disabled = false;
+
+          } else if (this.status !== 200) {
+            document.getElementById("output").innerHTML = converter.makeHtml("<p>Error: " + this.status + "</p>");
+            document.getElementById("submit_button").disabled = false;
+          }
+        };
+
+        xhr.send(data);
+      }
+
+      function refreshContextStats() {
+          var xhr = new XMLHttpRequest();
+          xhr.open("POST", "http://127.0.0.1:5000/context_stats/", true); // GET request to /context_stats
+
+          xhr.onreadystatechange = function() {
+              if (this.readyState === XMLHttpRequest.DONE) {
+                  if (this.status === 200) {
+                    var response = JSON.parse(this.responseText);
+                    document.getElementById("tokenCount").innerText = response.token_count.toLocaleString();
+
+                    var filePathsDiv = document.getElementById("filePaths");
+                    filePathsDiv.innerHTML = ""; // Clear previous file paths
+
+                    response.file_paths.forEach(function(filePath) {
+                        var pathElement = document.createElement("p");  // Creates <p> elements
+                        pathElement.style.fontSize = "12px"; // Style the font size if desired.
+
+                        pathElement.innerText = filePath;
+                        filePathsDiv.appendChild(pathElement);
+                    });
+                  } else {
+                      document.getElementById("contextStats").innerText = "Error: " + this.status;
+                  }
+              }
+          };
+          xhr.send();
+      }
+
+      function toggleFilePaths() {
+        var filePathsDiv = document.getElementById("filePaths");
+        var arrow = document.getElementById("filePathArrow");
+        if (filePathsDiv.style.display === "none") {
+            filePathsDiv.style.display = "block";
+            arrow.innerHTML = "&#9650;"; // Up arrow
+        } else {
+            filePathsDiv.style.display = "none";
+            arrow.innerHTML = "&#9660;"; // Down arrow
+        }
+      }
     </script>
 </head>
 <body>
 
-<h3>Ask Gemini a question about your code base.</h3>
+<div id="leftRail" class="contextStats">
+    <button class="cs-button-solid" style="margin-bottom: 0.5em;"onclick="refreshContextStats()">Refresh</button>
+    <div style="font-size: 14px;margin-bottom: 0.5em;">Tokens: <span id="tokenCount"></span></div>
+    <div id="filePathsContainer">
+      <div onclick="toggleFilePaths()" style="cursor: pointer; user-select: none;font-size:14px;margin-bottom: 0.5em;">  <!-- Header -->
+          Included Code: <span id="filePathArrow">&#9660;</span>  <!-- Down arrow initially -->
+      </div>
+      <div id="filePaths" style="display: none; overflow-y: auto; max-height: 500px;border: 1px solid #eee;"></div>
+  </div>
+</div>
 
-<div style="text-align:center">
-    <input type="text" class="cs-input" id="userInput" size=70 placeholder="Enter your query">
+<div id="mainContent">
+
+  <div style="display: flex; justify-content: space-between; align-items: center;">
+    Ask Gemini a question about your code base.
     <button class="cs-button-solid cs-submit" id="submit_button" onclick="queryServer()">Submit</button>
+  </div>
+
+  <div style="text-align:left">
+      <input type="text" class="cs-input" id="userInput" size=70 placeholder="Enter your query" onkeydown="handleKeyDown(event)">
+  </div>
+
+  <div id = "output" class="bot-message"></div>
 </div>
-<div style="text-align:center">
-    <input type="checkbox" id="includeCodeCheckbox" checked="true">
-    <label for="includeCodeCheckbox">Include code</label>
-</div>
-
-<div id = "output"></div>
-
-<script>
-  function queryServer() {
-    document.getElementById("submit_button").disabled = true;
-    var converter = new showdown.Converter();
-
-    var userInput = document.getElementById("userInput").value;
-    document.getElementById("output").innerHTML = converter.makeHtml("<p>Sending query and waiting for a response...</p>");
-
-    var data = JSON.stringify({ 
-        message: userInput,
-        include_code: document.getElementById("includeCodeCheckbox").checked,
-        cache_key: window.cacheKey
-     });
-
-    var serverUrl = "http://127.0.0.1:5000/query/"; 
-
-    var xhr = new XMLHttpRequest();
-    xhr.open("POST", serverUrl, true);
-    xhr.setRequestHeader("Content-Type", "application/json");
-
-    xhr.onreadystatechange = function() {
-      if (this.readyState === XMLHttpRequest.DONE && this.status === 200) {
-        response = JSON.parse(this.responseText);
-        var markdownOutput = response.answer; 
-        console.log("Received: " + response.answer);
-        document.getElementById("output").innerHTML = converter.makeHtml(markdownOutput);
-        document.getElementById("submit_button").disabled = false;
-
-      } else if (this.status !== 200) {
-        document.getElementById("output").src = converter.makeHtml("<p>Error: " + this.status + "</p>");
-        document.getElementById("submit_button").disabled = false;
-      }
-    };
-
-    xhr.send(data);
-  }
-</script>
-
 </body>
 </html>
