@@ -23,11 +23,34 @@ from flask_cors import CORS
 import tiktoken
 import datetime
 
+    # Define our request defaults
+model = "gemini-1.5-pro-001"
+chunk_size=500000
+temperature = 0.1
+max_tokens = 8192
+top_p = 1.0
+frequency_penalty = 0.0
+presence_penalty = 0.0
+log_level = "INFO"
 
-def count_tokens(text, model_name):
-    encoding = tiktoken.encoding_for_model(model_name)
-    tokens = encoding.encode(text)
-    return len(tokens)
+def get_genai_model():
+    safety_settings = {
+        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+    }
+    
+    generation_config = {
+        "temperature": temperature,
+        "top_p": top_p,
+        "top_k": 40,
+        "max_output_tokens": max_tokens,
+    }
+
+    # Define our non cache
+    genai_model = genai.GenerativeModel(model_name=model, generation_config=generation_config, safety_settings=safety_settings)
+    return genai_model
 
 def check_required_env_vars():
     """Check required environment variables"""
@@ -153,7 +176,7 @@ def answer_question(
     }
     
     # Define our non cache
-    genai_model = genai.GenerativeModel(model_name=model, generation_config=generation_config, safety_settings=safety_settings)
+    genai_model = get_genai_model()
    
    # Check out context to see if it's too big
     message_prompt = partial_prompt(message)
@@ -211,10 +234,13 @@ def answer_question(
     return conversation_result
 
 
-def read_project_files(exclude_dirs=['.github', '.git', '.cm', '.idea', 'webpack', 'spec', 'script', 'benchmarks', 'bin', 'benchmarks', 'log', 'node_modules', 'dist']):
+def read_project_files(exclude_dirs=['.github', '.git', '.cm', '.idea', 'webpack', 'spec', 'script', 'benchmarks', 'bin', 'benchmarks', 'log', 'node_modules', 'dist', 'fixtures']):
     project_content = []
+    dir_paths = []
     for root, dirs, files in os.walk('code'):
         dirs[:] = [d for d in dirs if d not in exclude_dirs]
+        dir_paths.append(f"{root}\n")
+
         #logger.debug(f"Dirs {dirs}")
         for file in files:
             if file.endswith(('.py', '.json', '.kt', '.html', '.js', '.cs', '.qml', '.asp', '.vb',
@@ -224,7 +250,7 @@ def read_project_files(exclude_dirs=['.github', '.git', '.cm', '.idea', 'webpack
                 with open(file_path, 'r') as f:
                     content = f.read()
                 project_content.append(f"File: {file_path}\n\n ```{content}```\n\n")
-    return '\n'.join(project_content)
+    return ['\n'.join(project_content), dir_paths]
 
 def clean_response(answer):
     response = answer
@@ -256,18 +282,20 @@ def send_message(
     # Use Rest as the transport agent
     genai.configure(api_key=api_key, transport="rest")
 
-    project_content = ""
+    project_content = [""]
     if include_code:
         # Read the entire project content
+        logger.debug("Reading project files")
         project_content = read_project_files()
-        project_size = len(project_content)
+        logger.debug(f"Project content: {project_content}")
+        project_size = len(project_content[0])
         logger.debug(f"Project Size: {project_size}")
 
     #logger.debug(f"Project content: {project_content}")
     
     # Ask the question
     chunked_answer = answer_question(
-        context=project_content,
+        context=project_content[0],
         message=message,
         include_code=include_code,
         cache_key=cache_key,
@@ -288,20 +316,9 @@ app = Flask(__name__, static_folder='chat_bot', static_url_path='')
 CORS(app)
 
 @app.route('/query/', methods=['POST'])
-
-def receive_data():
+def query_route():
   """Receives POST request with JSON data and returns a response."""
   try:
-
-    # Define our request defaults
-    model = "gemini-1.5-pro-001"
-    chunk_size=500000
-    temperature = 0.1
-    max_tokens = 8192
-    top_p = 1.0
-    frequency_penalty = 0.0
-    presence_penalty = 0.0
-    log_level = "INFO"
 
     # Extract data from incoming request.
     data = request.get_json()
@@ -312,6 +329,7 @@ def receive_data():
     if not message:
       return jsonify({'error': 'Missing "message" in JSON body'}), 400
 
+    logger.debug("Calling send_message")
     # Send our message to the model for a response
     answer = send_message(message=message, 
                           include_code = include_code,
@@ -324,11 +342,27 @@ def receive_data():
                           frequency_penalty=frequency_penalty,
                           presence_penalty=presence_penalty,
                           log_level=log_level)
-
+    logger.debug("Out of Send message")
     return jsonify({'answer': f'{answer}'}), 200
   except Exception as e:
     logger.debug(f"Exception occurred: {e}")
     return jsonify({'error': str(e)}), 500
+
+@app.route('/context_stats/', methods=['POST'])
+def context_stats_route():
+    """
+        Counts tokens of the project files using the specified model.
+    """
+    genai_model = get_genai_model()
+    # Extract included dirs (long term)
+    # Read project files appropriately and build out context for files
+    project_content = read_project_files()
+    # Count tokens
+    token_count = genai_model.count_tokens(project_content[0])
+    # Return JSON with token count
+    return jsonify({'file_paths': project_content[1], 'token_count': token_count.total_tokens}), 200
+
+
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=5000)
