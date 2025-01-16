@@ -121,7 +121,8 @@ def partial_prompt(message: str):
 def build_cached_content(
         context:str,
         cache_key: str,
-        model: str):
+        model: str
+):
     genai_model = get_genai_model()
     token_count = 0
 
@@ -202,7 +203,9 @@ def answer_question(
 
 # Iterates over the project files and returns an array of object designed to be used directly with Gemini [0] and a listing of 
 # directory paths to be used for display [1]
-def read_project_files(exclude_dirs=['.github', '.git', '.cm', '.idea', 'webpack', 'spec', 'script', 'benchmarks', 'bin', 'benchmarks', 'log', 'node_modules', 'dist', 'fixtures']):
+def read_project_files(
+        exclude_dirs=['.github', '.git', '.cm', '.idea', 'webpack', 'spec', 'script', 'benchmarks', 'bin', 'benchmarks', 'log', 'node_modules', 'dist', 'fixtures']
+):
     project_content = []
     dir_paths = []
     for root, dirs, files in os.walk('code'):
