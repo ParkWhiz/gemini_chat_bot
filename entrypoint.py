@@ -146,7 +146,6 @@ def build_cached_content(
         exists = False
 
         for c in caching.CachedContent.list():
-            logger.debug(f"Looking at cache: {c.display_name}")
             if c.display_name == cache_key:
                 exists = True
                 cache = c
