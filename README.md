@@ -32,9 +32,10 @@ These can either be overridden OR added to using a `exclude_dirs.json` file in t
 ### Files in scope
 Files are read on a whitelist basis by extension.  Like directories there is a default list that is considered.  This list is defined in `read_project_files` 
 
-```            if file.endswith(('.py', '.json', '.kt', '.html', '.js', '.cs', '.qml', '.asp', '.vb',
-                              '.ts', '.java', '.c', '.cpp', '.h', '.hpp', '.go', '.rs', '.swift',
-                              '.sh', '.rb', '.php', '.mdx', '.rs', '.sql')):
+```            
+if file.endswith(('.py', '.json', '.kt', '.html', '.js', '.cs', '.qml', '.asp', '.vb',
+            '.ts', '.java', '.c', '.cpp', '.h', '.hpp', '.go', '.rs', '.swift',
+            '.sh', '.rb', '.php', '.mdx', '.rs', '.sql')):
 ```
 
 This list can be extended or overridden by a `.include_extensions.json` file in the root of the volume that is mounted in the container.   There is a sample file `.include_extensions_example.json` in the root of the project.  It is a simple JSON document.
