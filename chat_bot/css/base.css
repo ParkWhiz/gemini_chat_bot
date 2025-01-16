@@ -1,0 +1,138 @@
+body {
+    font-family: sans-serif; /* Use a modern font */
+    line-height: 1.6;        /* Improve readability */
+    margin: 20px;            /* Add some margin */
+    color: #333;             /* Darker text color */
+    background-color: #f5f5f5;
+  }
+  #leftRail {
+      width: 275px; 
+      float: left;
+      padding: 20px;         /* Increased padding */
+      border-right: 1px solid #eee; /* Lighter border */
+      box-sizing: border-box;  /* Include padding in width */
+      background-color: #fff; /* White background for left rail */
+      border-right: 1px solid #ddd; /* Slightly darker border */
+      height: 100vh; 
+  }
+  #contextStats {
+      width: 100%;            /* Fill the left rail */
+      overflow-y: auto;
+      font-size: 12px;
+      background-color: #f9f9f9;
+      padding: 10px;          /* Add padding within the box */
+      border: 1px solid #eee; /* Light border around stats */
+      margin-bottom: 20px; /* Spacing below stats */
+      box-sizing: border-box;
+  }
+  #mainContent {
+      margin-left: 285px;       /* Match left rail width + padding */
+      padding: 20px;         /* Increased padding */
+      background-color: #fff;
+  }
+  #userInput {
+      width: calc(100% - 100px); /* Adjust width for button */
+      padding: 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      margin-right: 10px;       /* Space between input and button */
+      box-sizing: border-box;
+
+  }
+  .cs-button-solid{
+    width: 90px;
+    padding: 10px;
+    border: none;
+    border-radius: 2px;
+    background-color: #3d84d9; /* Example color */
+    color: white;
+    cursor: pointer;
+    margin-bottom: 0.5em;
+  }
+
+  #output {
+      background-color: #fff; /* White background for output area */
+      padding: 15px;
+      border: 1px solid #eee;
+      border-radius: 5px; /* Rounded corners */
+      margin-top: 20px; /* Add some spacing */
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1); /* Subtle shadow */
+  }
+
+  .user-message { /* Style user's messages */
+      background-color: #e9f2ff; /* Light blue for user messages */
+      padding: 10px;
+      border-radius: 10px; /* More rounded corners for messages */
+      margin-bottom: 10px;
+      align-self: flex-end;
+  }
+
+  .bot-message { /* Style bot's messages */
+      background-color: #f0f0f0; /* Light gray for bot messages */
+      padding: 10px;
+      border-radius: 10px;
+      margin-bottom: 10px;
+      align-self: flex-start;
+  }
+  #loadingIndicator {
+      display: none; /* Hidden by default */
+      width: 32px;
+      height: 32px;
+      margin-left: 10px; /* Space to the right of the input */
+      vertical-align: middle; /* Align with the input box */
+  }
+  .lds-ring {
+      display: inline-block;
+      position: relative;
+      width: 32px;
+      height: 32px;
+  }
+  .lds-ring div {
+      box-sizing: border-box;
+      display: block;
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      margin: 8px;
+      border: 8px solid #3d84d9; /* Match button color */
+      border-radius: 50%;
+      animation: lds-ring 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+      border-color: #3d84d9 transparent transparent transparent;
+  }
+  .lds-ring div:nth-child(1) {
+      animation-delay: -0.45s;
+  }
+  .lds-ring div:nth-child(2) {
+      animation-delay: -0.3s;
+  }
+  .lds-ring div:nth-child(3) {
+      animation-delay: -0.15s;
+  }
+  @keyframes lds-ring {
+      0% {
+          transform: rotate(0deg);
+      }
+      100% {
+          transform: rotate(360deg);
+      }
+  }
+  #submit_button { /* Styles specifically for the submit button */
+      width: auto;       /* Let the button size to its content */
+      padding: 8px; /* Standard button padding */
+      border: none;
+      border-radius: 8px; /* More rounded for a chat look */
+      background-color: #3d84d9;
+      color: white;
+      cursor: pointer;
+      margin-bottom: 0.5em;
+      display: flex;       /* Use flexbox for icon alignment */
+      align-items: center; /* Center icon and text vertically */
+      transition: background-color 0.2s; /* Smooth hover effect */
+  }
+
+  #submit_button:hover {
+      background-color: #306bac; /* Darker shade on hover */
+  }
+  #submit_button svg {
+      margin-right: 0px;    /* Spacing between icon and text */
+  }
