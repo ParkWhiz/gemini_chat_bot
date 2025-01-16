@@ -10,7 +10,9 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 import os
-from typing import List
+from typing import List, Tuple, Union
+import csv
+import json
 
 import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
@@ -127,39 +129,43 @@ def build_cached_content(
     token_count = 0
 
     prompt_for_context = context_prompt(context)
-    token_count = genai_model.count_tokens(prompt_for_context)
-    logger.debug(f"Context token count: {token_count}")
+    try:
+        token_count = genai_model.count_tokens(prompt_for_context)
+        logger.debug(f"Context token count: {token_count}")
 
-    # Set an arbitrary limit (2,000,000 token limit) to avoid the final question and prompt from being too large.
-    # This can probably be larger in reality.
-    if token_count.total_tokens > 1900000:
-        return ["ERROR: Context too large", ""]
-        
-    # A cache can only be built if the min tokens is 32768, else it's too small to bother.  Skip the step but report OK
-    if (token_count.total_tokens < 32768):
-        return ["OK", ""]
-   
-    cache = ""
-    exists = False
+        # Set an arbitrary limit (2,000,000 token limit) to avoid the final question and prompt from being too large.
+        # This can probably be larger in reality.
+        if token_count.total_tokens > 1900000:
+            return ["ERROR: Context too large", ""]
+            
+        # A cache can only be built if the min tokens is 32768, else it's too small to bother.  Skip the step but report OK
+        if (token_count.total_tokens < 32768):
+            return ["OK", ""]
+    
+        cache = ""
+        exists = False
 
-    for c in caching.CachedContent.list():
-        logger.debug(f"Looking at cache: {c.display_name}")
-        if c.display_name == cache_key:
-            exists = True
-            cache = c
+        for c in caching.CachedContent.list():
+            logger.debug(f"Looking at cache: {c.display_name}")
+            if c.display_name == cache_key:
+                exists = True
+                cache = c
 
-    if not exists:           
-        # Use the cache_key and upload the project as a cache
-        logger.debug(f"Caching with cache key {cache_key} - {model}") 
-        cache = caching.CachedContent.create(
-            model= model,
-            contents=prompt_for_context, 
-            display_name=cache_key, 
-            ttl=datetime.timedelta(minutes=5)
-        ) 
-        logger.debug("Finished creating context cache")
+        if not exists:           
+            # Use the cache_key and upload the project as a cache
+            logger.debug(f"Caching with cache key {cache_key} - {model}") 
+            cache = caching.CachedContent.create(
+                model= model,
+                contents=prompt_for_context, 
+                display_name=cache_key, 
+                ttl=datetime.timedelta(minutes=5)
+            ) 
+            logger.debug("Finished creating context cache")
 
-    return ["OK", cache]
+        return ["OK", cache]
+    except Exception as e:
+        return [f"ERROR: {e}", ""]
+
 
 # Base method to take input and send a question to Gemini
 def answer_question(
@@ -204,17 +210,59 @@ def answer_question(
 # Iterates over the project files and returns an array of object designed to be used directly with Gemini [0] and a listing of 
 # directory paths to be used for display [1]
 def read_project_files(
-        exclude_dirs=['.github', '.git', '.cm', '.idea', 'webpack', 'spec', 'script', 'benchmarks', 'bin', 'benchmarks', 'log', 'node_modules', 'dist', 'fixtures']
+        exclude_dirs=['.github', '.git', '.cm', '.idea', 'webpack', 'spec', 'script', 'benchmarks', 'bin', 'benchmarks', 'log', 'node_modules', 'dist', 'fixtures', 'vendor']
 ):
+    logger.debug("Reading project files")
+
+    # Look for the presence of .exclude_dirs and use this to either extend or override exclude_dirs
+    exclude_file = "code/.exclude_dirs.json" 
+    try:
+        if os.path.exists(exclude_file):
+            logger.debug("Looking at exclude_dirs on filesystem")
+            with open(exclude_file, 'r') as f:
+                exclude_data = json.load(f)  # Parse as JSON
+
+                override = exclude_data.get('override', False) # Default is False if not found
+
+                if override:
+                    exclude_dirs = exclude_data.get('exclude_dirs', [])  # Use JSON's exclude_dirs
+                else:
+                    exclude_dirs.extend(exclude_data.get('exclude_dirs', [])) #Extend the list with JSON entries if not override
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Warning: Error reading or parsing {exclude_file}: {e}")
+
+
+    # The default file extensions that will be considered
+    include_files = ['.asp', '.c', '.cpp', '.cs', '.go', '.h', '.hpp', '.html', '.java', 
+                     '.js', '.json', '.kt', '.mdx', '.php', '.py', '.qml', '.rb', '.rs', 
+                     '.sh', '.sql', '.swift', '.ts', '.vb']
+    
+    # Look for the presence of .include_extensions.json to either extend or override include_files
+    include_file = "code/.include_extensions.json" 
+    try:
+        if os.path.exists(include_file):
+            logger.debug("Looking at include_files on filesystem")
+            with open(include_file, 'r') as f:
+                include_data = json.load(f)  # Parse as JSON
+
+                override = include_data.get('override', False) # Default is False if not found
+
+                if override:
+                    include_files = include_data.get('include_extensions', [])
+                else:
+                    logger.debug("Extending include_files")
+                    include_files.extend(include_data.get('include_extensions', [])) #Extend the list with JSON entries if not override
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"Warning: Error reading or parsing {include_file}: {e}")    
+        
+    logger.debug(f"Including extensions: {include_files}")
     project_content = []
     dir_paths = []
     for root, dirs, files in os.walk('code'):
         dirs[:] = [d for d in dirs if d not in exclude_dirs]
         dir_paths.append(f"{root}\n")
         for file in files:
-            if file.endswith(('.py', '.json', '.kt', '.html', '.js', '.cs', '.qml', '.asp', '.vb',
-                              '.ts', '.java', '.c', '.cpp', '.h', '.hpp', '.go', '.rs', '.swift',
-                              '.sh', '.rb', '.php', '.mdx', '.rs', '.sql')):
+            if file.endswith(tuple(include_files)):
                 file_path = os.path.join(root, file)
                 with open(file_path, 'r') as f:
                     content = f.read()
@@ -304,9 +352,15 @@ def context_stats_route():
     # Read project files appropriately and build out context for files
     project_content = read_project_files()
     # Count tokens
-    token_count = genai_model.count_tokens(project_content[0])
-    # Return JSON with token count
-    return jsonify({'file_paths': project_content[1], 'token_count': token_count.total_tokens}), 200
+    try:
+        token_count = genai_model.count_tokens(project_content[0])
+        # Return JSON with token count
+        return jsonify({'status': 'OK', 'file_paths': project_content[1], 'token_count': token_count.total_tokens}), 200
+    except Exception as e:
+        logger.debug(f"Exception getting token stats: {e}")
+        return jsonify({'status': 'ERROR', 'error': str(e), 'file_paths': project_content[1]}), 500
+
+
 
 
 

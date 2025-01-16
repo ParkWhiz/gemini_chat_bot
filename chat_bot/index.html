@@ -33,15 +33,34 @@
           }
         }
 
+      function disableUserInput() {
+        document.getElementById("userInput").disabled = true;
+        document.getElementById("submit_button").disabled = true;
+      }
+
+      function enableUserInput() {
+        document.getElementById("userInput").disabled = false;
+        document.getElementById("submit_button").disabled = false;
+      }
+
+      function showLoadingIndicator() {
+        document.getElementById("submit_button").style.display = "none";
+        document.getElementById("loadingIndicator").style.display = "inline-block"; // Show next to input
+      }
+
+      function showSubmitButton() {
+        document.getElementById("submit_button").style.display = "inline-block";
+        document.getElementById("loadingIndicator").style.display = "none"; // Show next to input
+      }
+
       function queryServer() {
         var userInput = document.getElementById("userInput").value;
         if (userInput == "") {
             return;
         }
         
-        document.getElementById("submit_button").style.display = "none";
-        document.getElementById("loadingIndicator").style.display = "inline-block"; // Show next to input
-        document.getElementById("userInput").disabled = true;
+        disableUserInput();
+        showLoadingIndicator();
         var converter = new showdown.Converter();
 
         var userInput = document.getElementById("userInput").value;
@@ -64,9 +83,7 @@
 
         xhr.onreadystatechange = function() {
             if (this.readyState === XMLHttpRequest.DONE) {
-                document.getElementById("submit_button").style.display = "inline-block"; // Show button again
-                document.getElementById("loadingIndicator").style.display = "none"; // Hide loading indicator
-                document.getElementById("userInput").disabled = false; // Enable input
+            
                 if (this.status === 200) {
                     response = JSON.parse(this.responseText);
                     var markdownOutput = response.answer; 
@@ -74,41 +91,50 @@
                     answer.className = "bot-message"
                     answer.innerHTML = converter.makeHtml(markdownOutput);
                     document.getElementById("output").prepend(answer);
-                    document.getElementById("submit_button").disabled = false;
                 } else {
                     var answer = document.createElement("p");  // Creates <p> elements
                     answer.className = "bot-message"
                     answer.innerHTML = converter.makeHtml("Error: " + this.status);
                     document.getElementById("output").prepend(answer);
-                    document.getElementById("submit_button").disabled = false;
                 }
+                showSubmitButton();
+                enableUserInput();
             }
         };
 
         xhr.send(data);
       }
 
+      function populateFileList(response) {
+        var filePathsDiv = document.getElementById("filePaths");
+        filePathsDiv.innerHTML = ""; // Clear previous file paths
+
+        response.file_paths.forEach(function(filePath) {
+            var pathElement = document.createElement("p");  // Creates <p> elements
+            pathElement.style.fontSize = "12px"; // Style the font size if desired.
+            pathElement.innerText = filePath;
+            filePathsDiv.appendChild(pathElement);
+        });
+      }
       function refreshContextStats() {
+        
           var xhr = new XMLHttpRequest();
           xhr.open("POST", "http://127.0.0.1:5000/context_stats/", true); // GET request to /context_stats
 
           xhr.onreadystatechange = function() {
               if (this.readyState === XMLHttpRequest.DONE) {
+                var errorDiv = document.getElementById("contextStatsError"); // Get the error div
                   if (this.status === 200) {
+                    errorDiv.style.display = "none"; // Hide error div
                     var response = JSON.parse(this.responseText);
                     document.getElementById("tokenCount").innerText = response.token_count.toLocaleString();
-
-                    var filePathsDiv = document.getElementById("filePaths");
-                    filePathsDiv.innerHTML = ""; // Clear previous file paths
-
-                    response.file_paths.forEach(function(filePath) {
-                        var pathElement = document.createElement("p");  // Creates <p> elements
-                        pathElement.style.fontSize = "12px"; // Style the font size if desired.
-                        pathElement.innerText = filePath;
-                        filePathsDiv.appendChild(pathElement);
-                    });
+                    populateFileList(response);
                   } else {
-                      document.getElementById("contextStats").innerText = "Error: " + this.status;
+                        errorDiv.style.display = "block"; // Show error div
+                        document.getElementById("tokenCount").innerText = "N/A";
+                        var response = JSON.parse(this.responseText);
+                        errorDiv.innerText = "Error: " + response.error;
+                        populateFileList(response);
                   }
               }
           };
@@ -120,10 +146,18 @@
         var arrow = document.getElementById("filePathArrow");
         if (filePathsDiv.style.display === "none") {
             filePathsDiv.style.display = "block";
-            arrow.innerHTML = "&#9650;"; // Up arrow
+            arrow.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708l6-6z"/>
+                </svg>
+            `; // Up arrow
         } else {
             filePathsDiv.style.display = "none";
-            arrow.innerHTML = "&#9660;"; // Down arrow
+            arrow.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                        <path fill-rule="evenodd" d="M1.646 4.646a.5.5 0 0 1 .708 0L8 10.293l5.646-5.647a.5.5 0 0 1 .708.708l-6 6a.5.5 0 0 1-.708 0l-6-6a.5.5 0 0 1 0-.708z"/>
+                    </svg>
+                `; // Down arrow
         }
       }
     </script>
@@ -132,12 +166,17 @@
 
 <div id="leftRail" class="contextStats">
     <button class="cs-button-solid" onclick="refreshContextStats()">Refresh</button>
+    <div id="contextStatsError" style="display: none; color: red; font-size: 14px;"></div>
     <div style="font-size: 14px;margin-bottom: 0.5em;">Tokens: <span id="tokenCount"></span></div>
-    <div id="filePathsContainer">
-      <div onclick="toggleFilePaths()" style="cursor: pointer; user-select: none;font-size:14px;margin-bottom: 0.5em;">  <!-- Header -->
-          Included Code: <span id="filePathArrow">&#9660;</span>  <!-- Down arrow initially -->
+    <div id="filePathsContainer" style="background-color: #f6f6f6;">
+      <div onclick="toggleFilePaths()" style="cursor: pointer; user-select: none;font-size:14px;margin: 0.5em;">  <!-- Header -->
+          Included Code: <span id="filePathArrow" style="float:right;margin-right:0.5em">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 16 16">
+                <path fill-rule="evenodd" d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708l6-6z"/>
+            </svg>
+          </span>  <!-- Up arrow initially -->
       </div>
-      <div id="filePaths" style="display: none; overflow-y: auto; max-height: 500px;border: 1px solid #eee;"></div>
+      <div id="filePaths" style="display: none; overflow-y: auto; max-height: 500px;border: 1px solid #eee;display:block"></div>
   </div>
 </div>
 
