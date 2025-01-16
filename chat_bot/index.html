@@ -49,13 +49,11 @@
           width: 90px;
           padding: 10px;
           border: none;
-          border-radius: 4px;
+          border-radius: 2px;
           background-color: #3d84d9; /* Example color */
           color: white;
           cursor: pointer;
-        }
-        .cs-input { /* Style the input field */
-            border: 1px solid #ddd;
+          margin-bottom: 0.5em;
         }
 
         #output {
@@ -82,6 +80,68 @@
             margin-bottom: 10px;
             align-self: flex-start;
         }
+        #loadingIndicator {
+            display: none; /* Hidden by default */
+            width: 32px;
+            height: 32px;
+            margin-left: 10px; /* Space to the right of the input */
+            vertical-align: middle; /* Align with the input box */
+        }
+        .lds-ring {
+            display: inline-block;
+            position: relative;
+            width: 32px;
+            height: 32px;
+        }
+        .lds-ring div {
+            box-sizing: border-box;
+            display: block;
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            margin: 8px;
+            border: 8px solid #3d84d9; /* Match button color */
+            border-radius: 50%;
+            animation: lds-ring 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+            border-color: #3d84d9 transparent transparent transparent;
+        }
+        .lds-ring div:nth-child(1) {
+            animation-delay: -0.45s;
+        }
+        .lds-ring div:nth-child(2) {
+            animation-delay: -0.3s;
+        }
+        .lds-ring div:nth-child(3) {
+            animation-delay: -0.15s;
+        }
+        @keyframes lds-ring {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+        #submit_button { /* Styles specifically for the submit button */
+            width: auto;       /* Let the button size to its content */
+            padding: 8px; /* Standard button padding */
+            border: none;
+            border-radius: 8px; /* More rounded for a chat look */
+            background-color: #3d84d9;
+            color: white;
+            cursor: pointer;
+            margin-bottom: 0.5em;
+            display: flex;       /* Use flexbox for icon alignment */
+            align-items: center; /* Center icon and text vertically */
+            transition: background-color 0.2s; /* Smooth hover effect */
+        }
+
+        #submit_button:hover {
+            background-color: #306bac; /* Darker shade on hover */
+        }
+        #submit_button svg {
+            margin-right: 0px;    /* Spacing between icon and text */
+        }        
 </style>
     <title>Ask Gemini (for Code Bases)!</title>
     <script>
@@ -113,11 +173,16 @@
         }
 
       function queryServer() {
-        document.getElementById("submit_button").disabled = true;
+        document.getElementById("submit_button").style.display = "none";
+        document.getElementById("loadingIndicator").style.display = "inline-block"; // Show next to input
+        document.getElementById("userInput").disabled = true;
         var converter = new showdown.Converter();
 
         var userInput = document.getElementById("userInput").value;
-        document.getElementById("output").innerHTML = converter.makeHtml("<p>Sending query and waiting for a response...</p>");
+        var userMessage = document.createElement("p");  // Creates <p> elements
+        userMessage.className = "user-message"
+        userMessage.innerHTML = converter.makeHtml(userInput);
+        document.getElementById("output").prepend(userMessage);
 
         var data = JSON.stringify({ 
             message: userInput,
@@ -132,17 +197,27 @@
         xhr.setRequestHeader("Content-Type", "application/json");
 
         xhr.onreadystatechange = function() {
-          if (this.readyState === XMLHttpRequest.DONE && this.status === 200) {
-            response = JSON.parse(this.responseText);
-            var markdownOutput = response.answer; 
-            console.log("Received: " + response.answer);
-            document.getElementById("output").innerHTML = converter.makeHtml(markdownOutput);
-            document.getElementById("submit_button").disabled = false;
-
-          } else if (this.status !== 200) {
-            document.getElementById("output").innerHTML = converter.makeHtml("<p>Error: " + this.status + "</p>");
-            document.getElementById("submit_button").disabled = false;
-          }
+            if (this.readyState === XMLHttpRequest.DONE) {
+                document.getElementById("submit_button").style.display = "inline-block"; // Show button again
+                document.getElementById("loadingIndicator").style.display = "none"; // Hide loading indicator
+                document.getElementById("userInput").disabled = false; // Enable input
+                if (this.status === 200) {
+                    response = JSON.parse(this.responseText);
+                    var markdownOutput = response.answer; 
+                    var answer = document.createElement("p");  // Creates <p> elements
+                    answer.className = "bot-message"
+                    answer.innerHTML = converter.makeHtml(markdownOutput);
+                    document.getElementById("output").prepend(answer);
+                    document.getElementById("submit_button").disabled = false;
+                } else {
+                    var answer = document.createElement("p");  // Creates <p> elements
+                    answer.className = "bot-message"
+                    answer.innerHTML = converter.makeHtml(markdownOutput);;
+                    document.getElementById("output").prepend(answer);
+                    document.getElementById("output").innerHTML = converter.makeHtml("<p>Error: " + this.status + "</p>");
+                    document.getElementById("submit_button").disabled = false;
+                }
+            }
         };
 
         xhr.send(data);
@@ -192,7 +267,7 @@
 <body>
 
 <div id="leftRail" class="contextStats">
-    <button class="cs-button-solid" style="margin-bottom: 0.5em;"onclick="refreshContextStats()">Refresh</button>
+    <button class="cs-button-solid" onclick="refreshContextStats()">Refresh</button>
     <div style="font-size: 14px;margin-bottom: 0.5em;">Tokens: <span id="tokenCount"></span></div>
     <div id="filePathsContainer">
       <div onclick="toggleFilePaths()" style="cursor: pointer; user-select: none;font-size:14px;margin-bottom: 0.5em;">  <!-- Header -->
@@ -206,12 +281,21 @@
 
   <div style="display: flex; justify-content: space-between; align-items: center;">
     Ask Gemini a question about your code base.
-    <button class="cs-button-solid cs-submit" id="submit_button" onclick="queryServer()">Submit</button>
+  </div>        
+  
+  <div style="display:flex; text-align:left">
+      <input type="text" class="cs-input" id="userInput" size=50 placeholder="Enter your query" onkeydown="handleKeyDown(event)">
+      <div id="loadingIndicator" class="lds-ring"><div></div><div></div><div></div><div></div></div>      
+      <button class="cs-button-solid cs-submit" id="submit_button" onclick="queryServer()">
+        <svg fill="#ffffff" width="24px" height="24px" viewBox="0 0 128 128" id="Layer_1" version="1.1" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+            <g>
+                <path d="M38.3,95.9L93.7,64L38.3,32.1L38.3,95.9z M77.7,64L46.3,82.1l0-36.1L77.7,64z"/>
+            </g>
+        </svg>  
+    </button>
   </div>
 
-  <div style="text-align:left">
-      <input type="text" class="cs-input" id="userInput" size=70 placeholder="Enter your query" onkeydown="handleKeyDown(event)">
-  </div>
+  
 
   <div id = "output" class="bot-message"></div>
 </div>

@@ -273,7 +273,7 @@ def query_route():
     # Extract data from incoming request.
     data = request.get_json()
     message = data.get('message')
-    include_code = data.get('include_code')
+    include_code = data.get('include_code') #At this point this is ALWAYS true and was removed from the form.
     cache_key = data.get("cache_key")
 
     if not message:
