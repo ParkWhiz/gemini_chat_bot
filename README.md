@@ -13,6 +13,6 @@ For convenience the script `run_service.sh` can be leveraged.
 ## Open Chat Bot and submit a request.
 Navigate to `http://127.0.0.1:5000/index.html`
 
-Enter your query, hit submit, be patient, especially on a large code base.
+Enter your query, hit enter/submit, be patient, especially on a large code base.   The first upload will generate a context cache with your code base context so subsequent queries will be speedier.
 
 Note: If you are on MacOS Monterey or later and have AirPlay enabled, then you will be unable to use port 5000. You must either disable AirPlay or run this project on a different port.
