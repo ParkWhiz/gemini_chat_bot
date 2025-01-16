@@ -10,7 +10,7 @@ You'll need this as an arg to start the service
 For convenience the script `run_service.sh` can be leveraged.
 ```./run_service.sh GEMINI_API_KEY YOUR_CODE_DIRECTORY```
 
-## Alternate Setup
+## Optional Setup
 ### Directories in scope
 There is a set of directories normally meant to contain test data or other fixtures that are often large and can cause projects to grow past the context window size (think `vendor`, `node_modules`, `spec`).  There is a normal set of files that are excluded in the code.  There are defined in `read_project_files`
 
