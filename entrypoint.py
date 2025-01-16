@@ -189,7 +189,7 @@ def answer_question(
     if cache != "":
         logger.debug("Using context cache to init model")
         genai_model = genai.GenerativeModel.from_cached_content(cached_content=cache)
-        logger.debug("Genearting content respond")
+        logger.debug("Genearting content response")
         response = genai_model.generate_content([(
             prompt_for_question
         )])
