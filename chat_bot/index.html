@@ -49,7 +49,7 @@
           width: 90px;
           padding: 10px;
           border: none;
-          border-radius: 4px;
+          border-radius: 2px;
           background-color: #3d84d9; /* Example color */
           color: white;
           cursor: pointer;
@@ -122,6 +122,26 @@
                 transform: rotate(360deg);
             }
         }
+        #submit_button { /* Styles specifically for the submit button */
+            width: auto;       /* Let the button size to its content */
+            padding: 8px; /* Standard button padding */
+            border: none;
+            border-radius: 8px; /* More rounded for a chat look */
+            background-color: #3d84d9;
+            color: white;
+            cursor: pointer;
+            margin-bottom: 0.5em;
+            display: flex;       /* Use flexbox for icon alignment */
+            align-items: center; /* Center icon and text vertically */
+            transition: background-color 0.2s; /* Smooth hover effect */
+        }
+
+        #submit_button:hover {
+            background-color: #306bac; /* Darker shade on hover */
+        }
+        #submit_button svg {
+            margin-right: 0px;    /* Spacing between icon and text */
+        }        
 </style>
     <title>Ask Gemini (for Code Bases)!</title>
     <script>
@@ -266,7 +286,13 @@
   <div style="display:flex; text-align:left">
       <input type="text" class="cs-input" id="userInput" size=50 placeholder="Enter your query" onkeydown="handleKeyDown(event)">
       <div id="loadingIndicator" class="lds-ring"><div></div><div></div><div></div><div></div></div>      
-      <button class="cs-button-solid cs-submit" id="submit_button" onclick="queryServer()">Submit</button>
+      <button class="cs-button-solid cs-submit" id="submit_button" onclick="queryServer()">
+        <svg fill="#ffffff" width="24px" height="24px" viewBox="0 0 128 128" id="Layer_1" version="1.1" xml:space="preserve" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+            <g>
+                <path d="M38.3,95.9L93.7,64L38.3,32.1L38.3,95.9z M77.7,64L46.3,82.1l0-36.1L77.7,64z"/>
+            </g>
+        </svg>  
+    </button>
   </div>
 
   
