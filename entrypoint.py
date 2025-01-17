@@ -350,9 +350,10 @@ def context_stats_route():
     # Extract included dirs (long term)
     # Read project files appropriately and build out context for files
     project_content = read_project_files()
+    context_message = context_prompt(project_content[0])
     # Count tokens
     try:
-        token_count = genai_model.count_tokens(project_content[0])
+        token_count = genai_model.count_tokens(context_message)
         # Return JSON with token count
         return jsonify({'status': 'OK', 'file_paths': project_content[1], 'token_count': token_count.total_tokens}), 200
     except Exception as e:

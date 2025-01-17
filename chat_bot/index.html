@@ -124,10 +124,23 @@
           xhr.onreadystatechange = function() {
               if (this.readyState === XMLHttpRequest.DONE) {
                 var errorDiv = document.getElementById("contextStatsError"); // Get the error div
+                var tokenCountSpan = document.getElementById("tokenCount");
+
                   if (this.status === 200) {
                     errorDiv.style.display = "none"; // Hide error div
                     var response = JSON.parse(this.responseText);
-                    document.getElementById("tokenCount").innerText = response.token_count.toLocaleString();
+                    var tokenCount = response.token_count;
+                    tokenCountSpan.innerText = tokenCount.toLocaleString();
+
+                    // Apply color based on token count - just a pseudo warning system of large token counts
+                    // where we may exceed the context window
+                    if (tokenCount > 1900000) {
+                        tokenCountSpan.style.color = "red";
+                    } else if (tokenCount > 1500000) {
+                        tokenCountSpan.style.color = "orange";
+                    } else {
+                        tokenCountSpan.style.color = "black"; // Default color
+                    }
                     populateFileList(response);
                   } else {
                         errorDiv.style.display = "block"; // Show error div
